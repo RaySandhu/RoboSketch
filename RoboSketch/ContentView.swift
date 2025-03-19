@@ -1,61 +1,57 @@
-//
-//  ContentView.swift
-//  RoboSketch
-//
-//  Created by Ray Sandhu on 2025-03-17.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    // State for robot selection and drawing color
+    @State private var selectedRobot: String? = "Robot 1"
+    @State private var drawingColor: Color = .red
+    @State private var showBluetoothModal = false
+
+    // Define a list of robots with their corresponding colors.
+    let robots: [(name: String, color: Color)] = [
+        ("Robot 1", .red),
+        ("Robot 2", .blue),
+        ("Robot 3", .green),
+        ("Robot 4", .teal)
+    ]
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+        VStack(spacing: 0) {
+            // Top: Robot selector buttons
+            HStack {
+                ForEach(robots, id: \.name) { robot in
+                    RobotButton(
+                        robotName: robot.name,
+                        robotColor: robot.color,
+                        selectedRobot: $selectedRobot,
+                        drawingColor: $drawingColor,
+                        onBluetooth: {
+                            showBluetoothModal = true
+                        }
+                    )
                 }
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
+            .padding()
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            // Center: Drawing surface (canvas) with optional grid overlay
+            ZStack {
+                GridOverlayView()
+                SketchCanvasView(drawingColor: drawingColor)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+             
+            // Bottom: Action toolbar
+            ActionBar()
+        }
+        .edgesIgnoringSafeArea(.bottom)
+        .sheet(isPresented: $showBluetoothModal) {
+            BluetoothModalView()
         }
     }
 }
 
+
+
+
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
