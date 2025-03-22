@@ -7,7 +7,7 @@
 
 import SwiftUI
 import PencilKit
-
+ 
 struct SketchCanvasView: UIViewRepresentable {
     var drawingColor: Color
 
@@ -26,7 +26,7 @@ struct SketchCanvasView: UIViewRepresentable {
         canvasView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
         
         return canvasView
-    }
+    } 
     
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
         // Update the allowed color and the current tool when the drawingColor changes.
