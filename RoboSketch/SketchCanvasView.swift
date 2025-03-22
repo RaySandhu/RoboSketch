@@ -7,33 +7,77 @@
 
 import SwiftUI
 import PencilKit
- 
+
 struct SketchCanvasView: UIViewRepresentable {
     var drawingColor: Color
+    @Binding var paths: [ColoredPath]
 
     func makeUIView(context: Context) -> PKCanvasView {
-        let canvasView = RestrictedCanvasView()
+        let canvasView = CustomCanvasView()
         canvasView.backgroundColor = .clear
         canvasView.drawingPolicy = .anyInput
-        
-        // iOS 14+ tool picker – create your own instance
-        let toolPicker = PKToolPicker() 
+
+        let toolPicker = PKToolPicker()
         toolPicker.setVisible(true, forFirstResponder: canvasView)
         toolPicker.addObserver(canvasView)
         canvasView.becomeFirstResponder()
         
-        // Set the initial drawing tool using the provided drawingColor.
         canvasView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
+        canvasView.delegate = context.coordinator
+
+        (canvasView as? CustomCanvasView)?.onStrokeEnd = { stroke in
+            // Only process if we have a valid stroke.
+            if let stroke = stroke {
+                context.coordinator.convertStrokeToPath(stroke, in: canvasView)
+            }
+        }
         
         return canvasView
-    } 
+    }
+
     
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
-        // Update the allowed color and the current tool when the drawingColor changes.
-         if let restricted = uiView as? RestrictedCanvasView {
-             restricted.allowedColor = UIColor(drawingColor)
-         }
         uiView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
     }
-}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    // Coordinator to observe drawing changes.
+    class Coordinator: NSObject, PKCanvasViewDelegate {
+        var parent: SketchCanvasView
 
+        init(_ parent: SketchCanvasView) {
+            self.parent = parent
+        }
+        
+        func convertStrokeToPath(_ stroke: PKStroke, in canvasView: PKCanvasView) {
+            // Capture the current drawing color before any delay or further processing.
+            let strokeColor = self.parent.drawingColor
+
+            let newPath = UIBezierPath()
+            let points = stroke.path.interpolatedPoints(by: PKStrokePath.InterpolatedSlice.Stride.distance(1.0))
+            let pointArray = Array(points)
+            guard let firstPoint = pointArray.first else { return }
+            newPath.move(to: firstPoint.location)
+            for point in pointArray.dropFirst() {
+                newPath.addLine(to: point.location)
+            }
+            
+            // Use the captured color so that this stroke keeps the original color.
+            let coloredPath = ColoredPath(path: newPath, color: strokeColor)
+            self.parent.paths.append(coloredPath)
+            canvasView.drawing = PKDrawing()
+            
+            print("Final stroke converted to path")
+            // JARIN: This is where the points on the line are displayed
+                // will likely use some cleaned up version of these for path encoding
+            print(newPath) 
+        }
+
+
+
+    }
+
+}
