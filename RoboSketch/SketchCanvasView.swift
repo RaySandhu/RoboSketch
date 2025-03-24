@@ -7,6 +7,89 @@
 
 import SwiftUI
 import PencilKit
+import CoreGraphics
+
+extension CGPath {
+    func forEach(_ body: @escaping (CGPathElement) -> Void) {
+        let wrapper = BodyWrapper(body: body)
+        let pointer = Unmanaged.passRetained(wrapper).toOpaque()
+        self.apply(info: pointer) { (info, element) in
+            let wrapper = Unmanaged<BodyWrapper>.fromOpaque(info!).takeUnretainedValue()
+            wrapper.body(element.pointee)
+        }
+        Unmanaged<BodyWrapper>.fromOpaque(pointer).release()
+    }
+}
+
+private class BodyWrapper {
+    let body: (CGPathElement) -> Void
+    init(body: @escaping (CGPathElement) -> Void) {
+        self.body = body
+    }
+}
+
+
+extension UIBezierPath {
+    func toJSON() -> String? {
+        var commands: [[String: Any]] = []
+        
+        self.cgPath.forEach { element in
+            switch element.type {
+            case .moveToPoint:
+                let point = element.points[0]
+                // Always add a new moveTo command.
+                commands.append(["cmd": "moveTo", "points": [["x": point.x, "y": point.y]]])
+                
+            case .addLineToPoint:
+                let point = element.points[0]
+                // If the last command is a lineTo, append the point. Otherwise, create a new one.
+                if let last = commands.last, let lastCmd = last["cmd"] as? String, lastCmd == "lineTo" {
+                    var lastPoints = last["points"] as? [[String: CGFloat]] ?? []
+                    lastPoints.append(["x": point.x, "y": point.y])
+                    commands[commands.count - 1]["points"] = lastPoints
+                } else {
+                    commands.append(["cmd": "lineTo", "points": [["x": point.x, "y": point.y]]])
+                }
+                
+            case .addQuadCurveToPoint:
+                let controlPoint = element.points[0]
+                let endPoint = element.points[1]
+                commands.append([
+                    "cmd": "quadCurveTo",
+                    "points": [
+                        ["controlX": controlPoint.x, "controlY": controlPoint.y],
+                        ["x": endPoint.x, "y": endPoint.y]
+                    ]
+                ])
+                
+            case .addCurveToPoint:
+                let controlPoint1 = element.points[0]
+                let controlPoint2 = element.points[1]
+                let endPoint = element.points[2]
+                commands.append([
+                    "cmd": "curveTo",
+                    "points": [
+                        ["control1X": controlPoint1.x, "control1Y": controlPoint1.y],
+                        ["control2X": controlPoint2.x, "control2Y": controlPoint2.y],
+                        ["x": endPoint.x, "y": endPoint.y]
+                    ]
+                ])
+                
+            case .closeSubpath:
+                commands.append(["cmd": "closePath"])
+                
+            @unknown default:
+                break
+            }
+        }
+        
+        if let data = try? JSONSerialization.data(withJSONObject: commands, options: [.prettyPrinted]),
+           let jsonString = String(data: data, encoding: .utf8) {
+            return jsonString
+        }
+        return nil
+    }
+}
 
 struct SketchCanvasView: UIViewRepresentable {
     @Binding var drawingColor: Color
@@ -67,7 +150,7 @@ struct SketchCanvasView: UIViewRepresentable {
             let strokeColor = self.parent.drawingColor
 
             let newPath = UIBezierPath()
-            let points = stroke.path.interpolatedPoints(by: PKStrokePath.InterpolatedSlice.Stride.distance(1.0))
+            let points = stroke.path.interpolatedPoints(by: PKStrokePath.InterpolatedSlice.Stride.distance(5.0))
             let pointArray = Array(points)
             guard let firstPoint = pointArray.first else { return }
             newPath.move(to: firstPoint.location)
@@ -76,14 +159,14 @@ struct SketchCanvasView: UIViewRepresentable {
             }
             
             // Use the captured color so that this stroke keeps the original color.
-            let coloredPath = ColoredPath(path: newPath, color: strokeColor)
+            let coloredPath = ColoredPath(path: newPath, encodedPath: newPath.toJSON()!, color: strokeColor)
             self.parent.paths.append(coloredPath)
             canvasView.drawing = PKDrawing()
             
             print("Final stroke converted to path")
             // JARIN: This is where the points on the line are displayed
                 // will likely use some cleaned up version of these for path encoding
-            print(newPath) 
+            print(coloredPath.encodedPath)
         }
 
 
