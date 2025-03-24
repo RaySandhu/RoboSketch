@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct BluetoothModalView: View {
+    var onBluetooth: () -> Void
+
     // This is where you add your Bluetooth connection interface.
     var body: some View {
         VStack(spacing: 20) {
@@ -19,8 +21,7 @@ struct BluetoothModalView: View {
                 .padding()
 
             Button("Close") {
-                // Dismissal handled automatically or via @Environment(\.dismiss) in iOS 15+
-//                @Environment(\.dismiss)
+                onBluetooth()
             }
             .padding()
             .background(Color.gray.opacity(0.3))

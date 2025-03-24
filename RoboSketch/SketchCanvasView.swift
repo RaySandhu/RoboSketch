@@ -15,7 +15,7 @@ struct SketchCanvasView: UIViewRepresentable {
     func makeUIView(context: Context) -> PKCanvasView {
         let canvasView = CustomCanvasView()
         canvasView.backgroundColor = .clear
-        canvasView.drawingPolicy = .anyInput
+        canvasView.drawingPolicy = .anyInput // change to pencilOnly
 
         let toolPicker = PKToolPicker()
         toolPicker.setVisible(true, forFirstResponder: canvasView)

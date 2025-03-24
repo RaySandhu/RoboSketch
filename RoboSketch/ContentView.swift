@@ -28,7 +28,7 @@ struct ContentView: View {
                             selectedRobot: $selectedRobot,
                             drawingColor: $drawingColor,
                             onBluetooth: {
-                                showBluetoothModal = true
+                                showBluetoothModal = !showBluetoothModal
                             }
                         )
                     }
@@ -42,7 +42,15 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            ActionBar()
+            ActionBar(paths: $paths)
+        }
+        .edgesIgnoringSafeArea(.bottom)
+        .sheet(isPresented: $showBluetoothModal) {
+            BluetoothModalView(
+                onBluetooth: {
+                    showBluetoothModal = !showBluetoothModal
+                }
+            )
         }
     }
 }

@@ -8,6 +8,9 @@
 import SwiftUI
 
 struct ActionBar: View {
+    @Binding var paths: [ColoredPath]
+    @State private var undone: ColoredPath?
+
     var body: some View {
         HStack {
             Button("Save") {
@@ -17,19 +20,22 @@ struct ActionBar: View {
             .buttonStyle(RoundedButtonStyle(backgroundColor: .orange))
             
             Button("Redo") {
-                // TODO: Redo action here
+                if (undone != nil) {
+                    paths.append(undone!)
+                    undone = nil
+                }
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: .yellow))
             
             Button("Undo") {
-                // TODO: Undo action here
+                undone = paths.popLast()
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: .blue))
             
-            Button("Delete") {
-                // TODO: Delete action here
+            Button("Clear") {
+                paths = []
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: .red))
