@@ -20,7 +20,7 @@ struct PathsOverlayView: View {
                 ForEach(paths) { coloredPath in
                     // Create a SwiftUI Path from the UIBezierPath's CGPath.
                     Path(coloredPath.path.cgPath)
-                        .stroke(coloredPath.color, lineWidth: 2)
+                        .stroke(coloredPath.color, lineWidth: 4)
                 }
             }
         }

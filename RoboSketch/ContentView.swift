@@ -43,7 +43,7 @@ struct ContentView: View {
 
                 ZStack {
                     GridOverlayView()
-                    SketchCanvasView(drawingColor: drawingColor, paths: $paths)
+                    SketchCanvasView(drawingColor: $drawingColor, paths: $paths)
                     PathsOverlayView(paths: paths)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

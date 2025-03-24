@@ -9,7 +9,7 @@ import SwiftUI
 import PencilKit
 
 struct SketchCanvasView: UIViewRepresentable {
-    var drawingColor: Color
+    @Binding var drawingColor: Color
     @Binding var paths: [ColoredPath]
 
     func makeUIView(context: Context) -> PKCanvasView {
@@ -24,27 +24,26 @@ struct SketchCanvasView: UIViewRepresentable {
         
         canvasView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
         canvasView.delegate = context.coordinator
-
         
+        // Capture the coordinator so we always refer to the updated parent values.
+        let coordinator = context.coordinator
         (canvasView as? CustomCanvasView)?.onStrokeEnd = { stroke in
             guard let stroke = stroke else { return }
             
-            // Check if a path with the currently selected color already exists.
-            if paths.contains(where: { $0.color == drawingColor }) {
-                NotificationCenter.default.post(name: .snackbarMessage, object: "Additional paths of the same color are not allowed")
-
-                // Clear the current drawing stroke so it doesn't linger.
+            // Use coordinator.parent to get the current drawingColor.
+            if coordinator.parent.paths.contains(where: { $0.color == coordinator.parent.drawingColor }) {
+                NotificationCenter.default.post(name: .snackbarMessage,
+                                                object: "Additional paths of the same color are not allowed")
                 canvasView.drawing = PKDrawing()
                 return
             }
             
-            // Otherwise, convert the stroke into a path.
-            context.coordinator.convertStrokeToPath(stroke, in: canvasView)
+            coordinator.convertStrokeToPath(stroke, in: canvasView)
         }
-
         
         return canvasView
     }
+
 
     
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
