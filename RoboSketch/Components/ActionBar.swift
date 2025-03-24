@@ -12,7 +12,7 @@ extension Color {
 
 struct ActionBar: View {
     @Binding var paths: [ColoredPath]
-    @State private var undone: ColoredPath?
+    @State private var undone: [ColoredPath] = []
 
     var body: some View {
         HStack {
@@ -23,26 +23,27 @@ struct ActionBar: View {
             .buttonStyle(RoundedButtonStyle(backgroundColor: .orange))
             
             Button("Redo") {
-                if let undone = undone {
-                    paths.append(undone)
-                    self.undone = nil
+                if let lastUndone = undone.popLast() {
+                    paths.append(lastUndone)
                 }
             }
             .padding()
-            .buttonStyle(RoundedButtonStyle(backgroundColor: .yellow))
-            
+            .buttonStyle(RoundedButtonStyle(backgroundColor: undone.count == 0 ? .gray : .yellow))
+
             Button("Undo") {
-                undone = paths.popLast()
+                if let lastPath = paths.popLast() {
+                    undone.append(lastPath)
+                }
             }
             .padding()
-            .buttonStyle(RoundedButtonStyle(backgroundColor: .blue))
-            
+            .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .blue))
+
             Button("Clear") {
                 paths = []
             }
             .padding()
-            .buttonStyle(RoundedButtonStyle(backgroundColor: .red))
-            
+            .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .red))
+
             Button("Play") {
                 // TODO: Play action here
             }
