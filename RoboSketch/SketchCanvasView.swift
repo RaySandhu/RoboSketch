@@ -25,12 +25,23 @@ struct SketchCanvasView: UIViewRepresentable {
         canvasView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
         canvasView.delegate = context.coordinator
 
+        
         (canvasView as? CustomCanvasView)?.onStrokeEnd = { stroke in
-            // Only process if we have a valid stroke.
-            if let stroke = stroke {
-                context.coordinator.convertStrokeToPath(stroke, in: canvasView)
+            guard let stroke = stroke else { return }
+            
+            // Check if a path with the currently selected color already exists.
+            if paths.contains(where: { $0.color == drawingColor }) {
+                NotificationCenter.default.post(name: .snackbarMessage, object: "Additional paths of the same color are not allowed")
+
+                // Clear the current drawing stroke so it doesn't linger.
+                canvasView.drawing = PKDrawing()
+                return
             }
+            
+            // Otherwise, convert the stroke into a path.
+            context.coordinator.convertStrokeToPath(stroke, in: canvasView)
         }
+
         
         return canvasView
     }
