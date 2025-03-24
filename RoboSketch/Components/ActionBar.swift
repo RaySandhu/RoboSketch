@@ -17,14 +17,22 @@ struct ActionBar: View {
     var body: some View {
         HStack {
             Button("Save") {
-                savePaths()
+                if paths.count > 0 {
+                    savePaths()
+                } else{
+                    NotificationCenter.default.post(name: .snackbarMessage,
+                                                    object: "Nothing to save!")
+                }
             }
             .padding()
-            .buttonStyle(RoundedButtonStyle(backgroundColor: .orange))
-            
+            .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .orange))
+
             Button("Redo") {
                 if let lastUndone = undone.popLast() {
                     paths.append(lastUndone)
+                }else{
+                    NotificationCenter.default.post(name: .snackbarMessage,
+                                                    object: "Nothing to redo!")
                 }
             }
             .padding()
@@ -33,6 +41,9 @@ struct ActionBar: View {
             Button("Undo") {
                 if let lastPath = paths.popLast() {
                     undone.append(lastPath)
+                }else{
+                    NotificationCenter.default.post(name: .snackbarMessage,
+                                                    object: "Nothing to undo!")
                 }
             }
             .padding()
@@ -45,7 +56,7 @@ struct ActionBar: View {
             .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .red))
 
             Button("Play") {
-                // TODO: Play action here
+                generatePythonScript(from: paths)
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: .green))
@@ -104,6 +115,89 @@ struct ActionBar: View {
             print("File exists at: \(fileURL.path)")
         } else {
             print("File does NOT exist at: \(fileURL.path)")
+        }
+    }
+    
+    func generatePythonScript(from paths: [ColoredPath]) {
+        var scriptLines = [String]()
+        // Header and initialization
+        scriptLines.append("from picrawler import Picrawler")
+        scriptLines.append("from time import sleep")
+        scriptLines.append("")
+        // Instantiate PiCrawler with default servo indices (adjust if needed)
+        scriptLines.append("crawler = Picrawler([10,11,12,4,5,6,1,2,3,7,8,9])")
+        scriptLines.append("speed = 80")
+        scriptLines.append("")
+        scriptLines.append("def main():")
+        
+        // For each ColoredPath, decode its stored JSON encoding and generate commands.
+        for coloredPath in paths {
+            // We assume encodedPath is a non-optional String property of ColoredPath.
+            let encoded = coloredPath.encodedPath
+            if let data = encoded.data(using: .utf8) {
+                do {
+                    if let commands = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] {
+                        for command in commands {
+                            guard let cmd = command["cmd"] as? String,
+                                  let points = command["points"] as? [[String: Any]] else { continue }
+                            
+                            if cmd == "moveTo" {
+                                // For moveTo, we just note the starting point.
+                                if let pt = points.first,
+                                   let x = pt["x"],
+                                   let y = pt["y"] {
+                                    scriptLines.append("    # Starting point from moveTo: (\(x), \(y))")
+                                }
+                            } else if cmd == "lineTo" {
+                                // For a lineTo segment, iterate over each point.
+                                scriptLines.append("    # Begin lineTo segment")
+                                // In a more advanced generator, you’d compute turning angles and forward distances.
+                                // Here we simulate movement by a forward command for each point.
+                                for pt in points {
+                                    if let x = pt["x"], let y = pt["y"] {
+                                        scriptLines.append("    # Move toward point (\(x), \(y))")
+                                        scriptLines.append("    crawler.do_action('forward', 1, speed)")
+                                        scriptLines.append("    sleep(0.05)")
+                                    }
+                                }
+                            } else {
+                                scriptLines.append("    # Unknown command: \(cmd)")
+                            }
+                        }
+                    } else {
+                        print("Failed to decode JSON as an array for a path.")
+                    }
+                } catch {
+                    print("Error decoding encodedPath: \(error)")
+                }
+            } else {
+                print("Could not convert encodedPath to Data.")
+            }
+        }
+        
+        // End the script by standing
+        scriptLines.append("    crawler.do_step('stand', speed)")
+        scriptLines.append("    sleep(1)")
+        scriptLines.append("")
+        scriptLines.append("if __name__ == '__main__':")
+        scriptLines.append("    main()")
+        
+        // Join the lines into a single script string.
+        let script = scriptLines.joined(separator: "\n")
+        
+        // Save the generated script to the Documents directory.
+        let fileManager = FileManager.default
+        if let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let fileURL = documentsDirectory.appendingPathComponent("generated_script.py")
+            do {
+                try script.write(to: fileURL, atomically: true, encoding: .utf8)
+                print("Python script generated at: \(fileURL)")
+                // Copy the script to the clipboard.
+                UIPasteboard.general.string = script
+                print("Script copied to clipboard.")
+            } catch {
+                print("Error writing Python script: \(error)")
+            }
         }
     }
 }
