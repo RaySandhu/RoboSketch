@@ -12,9 +12,9 @@ struct SnackbarView: View {
     var body: some View {
         Text(message)
             .padding()
-            .background(Color.black.opacity(0.8))
             .foregroundColor(.white)
-            .cornerRadius(8)
+            .cornerRadius(20)
             .padding(.horizontal)
+            .background(Color.red.opacity(0.8))
     }
 }
