@@ -3,7 +3,7 @@
 //  RoboSketch
 //
 //  Created by Ray Sandhu on 2025-03-22.
-//
+//  Updated by Jarin Thundathil on 2025-04-04.
 
 import SwiftUI
 
@@ -13,4 +13,6 @@ struct ColoredPath: Identifiable {
     let path: UIBezierPath
     let encodedPath: String
     let color: Color
+    var nodes: [Node] = []
+    var isSelected: Bool = false
 }

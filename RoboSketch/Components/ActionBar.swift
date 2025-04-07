@@ -13,10 +13,11 @@ extension Color {
 struct ActionBar: View {
     @Binding var paths: [ColoredPath]
     @State private var undone: [ColoredPath] = []
+    @Binding var clearSignal: Bool
 
     var body: some View {
         HStack {
-            Button("Save") {
+            Button("Save") {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
                 if paths.count > 0 {
                     savePaths()
                 } else{
@@ -39,19 +40,23 @@ struct ActionBar: View {
             .buttonStyle(RoundedButtonStyle(backgroundColor: undone.count == 0 ? .gray : .yellow))
 
             Button("Undo") {
-                if let lastPath = paths.popLast() {
-                    undone.append(lastPath)
+                if let last = paths.popLast() {
+                    undone.append(last)
                 }else{
                     NotificationCenter.default.post(name: .snackbarMessage,
                                                     object: "Nothing to undo!")
                 }
             }
+            .disabled(paths.isEmpty)
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .blue))
 
             Button("Clear") {
-                paths = []
+                paths.removeAll()
+                undone.removeAll()
+                clearSignal.toggle() // Triggers PKCanvasView to clear
             }
+            .disabled(paths.isEmpty)
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .red))
 

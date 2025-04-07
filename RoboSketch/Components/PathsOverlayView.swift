@@ -3,26 +3,33 @@
 //  RoboSketch
 //
 //  Created by Ray Sandhu on 2025-03-22.
-//
+//  Updated by Jarin Thundathil on 2025-04-04.
+
+
 
 import SwiftUI
-// MARK: - Overlay to Render Finalized Paths
 
 struct PathsOverlayView: View {
-    var paths: [ColoredPath]
-    func printPaths() {
-        print(paths)
-    }
+    @Binding var paths: [ColoredPath]
     
     var body: some View {
+
         GeometryReader { geometry in
             ZStack {
                 ForEach(paths) { coloredPath in
-                    // Create a SwiftUI Path from the UIBezierPath's CGPath.
+                    // Draw the path
                     Path(coloredPath.path.cgPath)
-                        .stroke(coloredPath.color, lineWidth: 4)
+                        .stroke(coloredPath.color, lineWidth: 2)
+
+                    // Draw interactive nodes
+                    ForEach(coloredPath.nodes) { node in
+                        NodeView(node: node, position: node.position, color: coloredPath.color)
+                    }
                 }
             }
         }
     }
 }
+
+
+

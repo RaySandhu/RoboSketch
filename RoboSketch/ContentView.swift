@@ -1,18 +1,21 @@
 import SwiftUI
 import PencilKit
 
+
 // MARK: - ContentView
 extension Notification.Name {
     static let snackbarMessage = Notification.Name("snackbarMessage")
 }
 
 struct ContentView: View {
-    @State private var drawingColor: Color = .red
+    //@State private var drawingColor: Color = .red
     @State private var paths: [ColoredPath] = []  // Store finalized path objects
     // State for robot selection and drawing color
     @State private var selectedRobot: String? = "Robot 1"
     @State private var showBluetoothModal = false
     @State private var snackbarMessage: String? = nil  // Snackbar message state
+    @State private var clearSignal: Bool = false
+    @StateObject private var drawingContext = DrawingContext()
 
     // Define a list of robots with their corresponding colors.
     let robots: [(name: String, color: Color)] = [
@@ -32,7 +35,7 @@ struct ContentView: View {
                             robotName: robot.name,
                             robotColor: robot.color,
                             selectedRobot: $selectedRobot,
-                            drawingColor: $drawingColor,
+                            drawingColor: $drawingContext.drawingColor,
                             onBluetooth: {
                                 showBluetoothModal.toggle()
                             }
@@ -43,12 +46,13 @@ struct ContentView: View {
 
                 ZStack {
                     GridOverlayView()
-                    SketchCanvasView(drawingColor: $drawingColor, paths: $paths)
-                    PathsOverlayView(paths: paths)
+                    SketchCanvasView(context: drawingContext, paths: $paths, clearSignal: $clearSignal)
+                    PathsOverlayView(paths: $paths)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                ActionBar(paths: $paths)
+                //ActionBar(paths: $paths)
+                ActionBar(paths: $paths, clearSignal: $clearSignal)
             }
             .edgesIgnoringSafeArea(.bottom)
             .sheet(isPresented: $showBluetoothModal) {
@@ -73,10 +77,21 @@ struct ContentView: View {
                     }
             }
         }
+
         .onReceive(NotificationCenter.default.publisher(for: .snackbarMessage)) { notification in
             if let message = notification.object as? String {
                 withAnimation {
                     snackbarMessage = message
+                }
+
+                // Auto-dismiss after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    withAnimation {
+                        // Only clear if the message hasn't been replaced by a new one
+                        if snackbarMessage == message {
+                            snackbarMessage = nil
+                        }
+                    }
                 }
             }
         }

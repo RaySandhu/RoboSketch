@@ -3,7 +3,7 @@
 //  RoboSketch
 //
 //  Created by Ray Sandhu on 2025-03-18.
-//
+//  Updated by Jarin Thundathil on 2025-04-04.
 
 import SwiftUI
 import PencilKit
@@ -91,10 +91,15 @@ extension UIBezierPath {
     }
 }
 
-struct SketchCanvasView: UIViewRepresentable {
-    @Binding var drawingColor: Color
-    @Binding var paths: [ColoredPath]
+class DrawingContext: ObservableObject {
+    @Published var drawingColor: Color = .red
+}
 
+struct SketchCanvasView: UIViewRepresentable {
+    @ObservedObject var context: DrawingContext
+    @Binding var paths: [ColoredPath]
+    @Binding var clearSignal: Bool
+    
     func makeUIView(context: Context) -> PKCanvasView {
         let canvasView = CustomCanvasView()
         canvasView.backgroundColor = .clear
@@ -105,32 +110,40 @@ struct SketchCanvasView: UIViewRepresentable {
         toolPicker.addObserver(canvasView)
         canvasView.becomeFirstResponder()
         
-        canvasView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
+        //canvasView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
+        canvasView.tool = PKInkingTool(.pen, color: UIColor(self.context.drawingColor), width: 5)
         canvasView.delegate = context.coordinator
         
         // Capture the coordinator so we always refer to the updated parent values.
         let coordinator = context.coordinator
+
         (canvasView as? CustomCanvasView)?.onStrokeEnd = { stroke in
             guard let stroke = stroke else { return }
-            
-            // Use coordinator.parent to get the current drawingColor.
-            if coordinator.parent.paths.contains(where: { $0.color == coordinator.parent.drawingColor }) {
+
+            // ✅ Use the latest drawing color from SwiftUI state (not stale parent copy)
+            //let currentDrawingColor = self.drawingColor
+            let currentDrawingColor = self.context.drawingColor
+
+            if context.coordinator.hasPathWithColor(currentDrawingColor) {
                 NotificationCenter.default.post(name: .snackbarMessage,
                                                 object: "Additional paths of the same color are not allowed")
                 canvasView.drawing = PKDrawing()
                 return
             }
-            
-            coordinator.convertStrokeToPath(stroke, in: canvasView)
+
+            context.coordinator.convertStrokeToPath(stroke, in: canvasView, strokeColor: currentDrawingColor)
         }
         
         return canvasView
     }
 
-
     
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
-        uiView.tool = PKInkingTool(.pen, color: UIColor(drawingColor), width: 5)
+        uiView.tool = PKInkingTool(.pen, color: UIColor(self.context.drawingColor), width: 5)
+
+        if clearSignal {
+            uiView.drawing = PKDrawing()
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -145,10 +158,12 @@ struct SketchCanvasView: UIViewRepresentable {
             self.parent = parent
         }
         
-        func convertStrokeToPath(_ stroke: PKStroke, in canvasView: PKCanvasView) {
+        func hasPathWithColor(_ color: Color) -> Bool {
+            return parent.paths.contains(where: { $0.color == color })
+        }
+        
+        func convertStrokeToPath(_ stroke: PKStroke, in canvasView: PKCanvasView, strokeColor: Color) {
             // Capture the current drawing color before any delay or further processing.
-            let strokeColor = self.parent.drawingColor
-
             let newPath = UIBezierPath()
             let points = stroke.path.interpolatedPoints(by: PKStrokePath.InterpolatedSlice.Stride.distance(5.0))
             let pointArray = Array(points)
@@ -158,14 +173,28 @@ struct SketchCanvasView: UIViewRepresentable {
                 newPath.addLine(to: point.location)
             }
             
-            // Use the captured color so that this stroke keeps the original color.
-            let coloredPath = ColoredPath(path: newPath, encodedPath: newPath.toJSON()!, color: strokeColor)
-            self.parent.paths.append(coloredPath)
-            canvasView.drawing = PKDrawing()
             
+            let start = pointArray.first?.location ?? .zero
+            let end = pointArray.last?.location ?? .zero
+            let nodes = [Node(position: start), Node(position: end)]
+
+            let coloredPath = ColoredPath(
+                path: newPath,
+                encodedPath: "", // TODO: generate real encoding later if needed
+                color: strokeColor,
+                nodes: nodes
+            )
+//            self.parent.paths.append(coloredPath)
+//            
+//            print("Final stroke converted to path")
+//            // JARIN: This is where the points on the line are displayed
+//                // will likely use some cleaned up version of these for path encoding
+//            print(coloredPath.encodedPath)
+            
+            self.parent.paths.append(coloredPath)
+            canvasView.drawing = PKDrawing()  // ✅ clear the underlying stroke
+
             print("Final stroke converted to path")
-            // JARIN: This is where the points on the line are displayed
-                // will likely use some cleaned up version of these for path encoding
             print(coloredPath.encodedPath)
         }
 
