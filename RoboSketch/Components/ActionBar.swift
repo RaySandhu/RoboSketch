@@ -120,44 +120,48 @@ struct ActionBar: View {
     
     func generatePythonScript(from paths: [ColoredPath]) {
         var scriptLines = [String]()
-        // Header and initialization
-        scriptLines.append("from picrawler import Picrawler")
-        scriptLines.append("from time import sleep")
+        
+        // Header and initialization (matching your screenshot syntax)
+        scriptLines.append("from spider import Spider")
+        scriptLines.append("from ezblock import print, delay")
         scriptLines.append("")
-        // Instantiate PiCrawler with default servo indices (adjust if needed)
-        scriptLines.append("crawler = Picrawler([10,11,12,4,5,6,1,2,3,7,8,9])")
-        scriptLines.append("speed = 80")
+        scriptLines.append("crawler = Spider([10,11,12,4,5,6,1,2,3,7,8,9])")
+        scriptLines.append("speed = 1000")
         scriptLines.append("")
+        
+        // Define the main() function
         scriptLines.append("def main():")
         
-        // For each ColoredPath, decode its stored JSON encoding and generate commands.
+        // For each ColoredPath, decode its JSON and generate do_action calls.
         for coloredPath in paths {
-            // We assume encodedPath is a non-optional String property of ColoredPath.
             let encoded = coloredPath.encodedPath
             if let data = encoded.data(using: .utf8) {
                 do {
                     if let commands = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] {
                         for command in commands {
-                            guard let cmd = command["cmd"] as? String,
-                                  let points = command["points"] as? [[String: Any]] else { continue }
+                            guard
+                                let cmd = command["cmd"] as? String,
+                                let points = command["points"] as? [[String: Any]]
+                            else {
+                                continue
+                            }
                             
                             if cmd == "moveTo" {
-                                // For moveTo, we just note the starting point.
+                                // Just note the starting point
                                 if let pt = points.first,
                                    let x = pt["x"],
                                    let y = pt["y"] {
                                     scriptLines.append("    # Starting point from moveTo: (\(x), \(y))")
                                 }
                             } else if cmd == "lineTo" {
-                                // For a lineTo segment, iterate over each point.
+                                // Begin lineTo segment
                                 scriptLines.append("    # Begin lineTo segment")
-                                // In a more advanced generator, you’d compute turning angles and forward distances.
-                                // Here we simulate movement by a forward command for each point.
                                 for pt in points {
                                     if let x = pt["x"], let y = pt["y"] {
                                         scriptLines.append("    # Move toward point (\(x), \(y))")
-                                        scriptLines.append("    crawler.do_action('forward', 1, speed)")
-                                        scriptLines.append("    sleep(0.05)")
+                                        scriptLines.append("    crawler.do_action(\"forward\", 1, speed)")
+                                        // If you want a brief pause between steps, you can use:
+                                        // scriptLines.append("    delay(50)")  // ~50ms delay
                                     }
                                 }
                             } else {
@@ -176,23 +180,29 @@ struct ActionBar: View {
         }
         
         // End the script by standing
-        scriptLines.append("    crawler.do_step('stand', speed)")
-        scriptLines.append("    sleep(1)")
+        scriptLines.append("    crawler.do_action(\"stand\", 1, speed)")
         scriptLines.append("")
-        scriptLines.append("if __name__ == '__main__':")
+        
+        // Define forever() if you want to call main repeatedly
+        scriptLines.append("def forever():")
+        scriptLines.append("    main()")
+        scriptLines.append("")
+        
+        // (Optional) If you want to run main once when the script is called directly:
+        scriptLines.append("if __name__ == \"__main__\":")
         scriptLines.append("    main()")
         
         // Join the lines into a single script string.
         let script = scriptLines.joined(separator: "\n")
         
-        // Save the generated script to the Documents directory.
+        // Save the generated script to the Documents directory (adjust as needed).
         let fileManager = FileManager.default
         if let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
             let fileURL = documentsDirectory.appendingPathComponent("generated_script.py")
             do {
                 try script.write(to: fileURL, atomically: true, encoding: .utf8)
                 print("Python script generated at: \(fileURL)")
-                // Copy the script to the clipboard.
+                // Copy the script to the clipboard if desired.
                 UIPasteboard.general.string = script
                 print("Script copied to clipboard.")
             } catch {
