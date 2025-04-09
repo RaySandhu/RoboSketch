@@ -251,22 +251,3 @@ struct ActionBar: View {
         }
     }
 }
-
-
-
-
-
-nodes = {
-    "dance": """
-    def dance():
-        background_music('angry.mp3')
-        music_set_volume(50)
-        for _ in range(2):
-            _SPIDER__.do_action('stand', 1, speed)
-            _SPIDER__.do_action('sit', 1, speed)
-            _SPIDER__.do_action('push_up', 1, speed)
-            _SPIDER__.do_action('backward', 1, speed)
-            _SPIDER__.do_action('twist', 1, speed)
-
-"""
-}
