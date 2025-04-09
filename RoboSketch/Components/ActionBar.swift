@@ -292,8 +292,12 @@ struct ActionBar: View {
             do {
                 try script.write(to: fileURL, atomically: true, encoding: .utf8)
                 print("code \(fileURL)".replacingOccurrences(of: "%20", with: "\\ ").replacingOccurrences(of: "file://", with: ""))
-                // Optionally, copy the script to the clipboard.
-                UIPasteboard.general.string = script
+                
+                // JARIN TODO: Try to make copy to clipboard work
+                DispatchQueue.main.async {
+                    UIPasteboard.general.string = "Hello world"
+//                    UIPasteboard.general.string = script
+                }
                 print("Script copied to clipboard.")
             } catch {
                 print("Error writing Python script: \(error)")
