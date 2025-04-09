@@ -15,6 +15,7 @@ struct ActionBar: View {
     @State private var undone: [ColoredPath] = []
     @Binding var clearSignal: Bool
 
+
     var body: some View {
         HStack {
             Button("Save") {
@@ -133,10 +134,18 @@ struct ActionBar: View {
         scriptLines.append("crawler = Spider([10,11,12,4,5,6,1,2,3,7,8,9])")
         scriptLines.append("speed = 1000")
         scriptLines.append("")
+        NodeOptions.options.forEach { (key: String, value: String) in
+            scriptLines.append("\(value)")
+        }
         scriptLines.append("def main():")
+
         
         // Iterate over each ColoredPath
         for coloredPath in paths {
+            print(coloredPath.nodes[0].selectedOption ?? "default value")
+            if (coloredPath.nodes[0].selectedOption != nil) {
+                scriptLines.append("    \(coloredPath.nodes[0].selectedOption?.lowercased() ?? "#")()")
+            }
             let encoded = coloredPath.encodedPath
             if let data = encoded.data(using: .utf8) {
                 do {
@@ -265,6 +274,9 @@ struct ActionBar: View {
                                 scriptLines.append("    # Unknown command: \(cmd)")
                             }
                         }
+                        if (coloredPath.nodes[1].selectedOption != nil) {
+                            scriptLines.append("    \(coloredPath.nodes[1].selectedOption?.lowercased() ?? "#")()")
+                        }
                     } else {
                         print("Failed to decode JSON as an array for a path.")
                     }
@@ -277,7 +289,7 @@ struct ActionBar: View {
         }
         
         // End the script with the stand command.
-        scriptLines.append("    crawler.do_action(\"stand\", 1, speed)")
+//        scriptLines.append("    crawler.do_action(\"stand\", 1, speed)")
         scriptLines.append("")
         scriptLines.append("def forever():")
         scriptLines.append("    main()")

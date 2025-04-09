@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ColoredPath: Identifiable {
+struct ColoredPath: Identifiable, Hashable {
     // likely will need to include the robotName optionally
     let id = UUID()
     let path: UIBezierPath

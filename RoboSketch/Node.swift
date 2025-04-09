@@ -8,7 +8,8 @@
 
 import SwiftUI
 
-struct Node: Identifiable {
+struct Node: Identifiable, Hashable {
     let id = UUID()
     var position: CGPoint
+    var selectedOption: String?
 }

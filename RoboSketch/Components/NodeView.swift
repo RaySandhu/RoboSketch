@@ -7,22 +7,12 @@
 import SwiftUI
 
 struct NodeView: View {
-    var node: Node
-    var position: CGPoint
+    @Binding var node: Node
     var color: Color
 
     @State private var isActive = false
     @State private var showDropdown = false
-
-    let options = [
-        "Dance",
-        "Spin",
-        "Wave",
-        "Wait",
-        "Look up & down",
-        "Turn around",
-        "Play sad music"
-    ]
+    
 
     var body: some View {
         ZStack {
@@ -45,15 +35,16 @@ struct NodeView: View {
                     VStack(spacing: 0) {
                         Spacer().frame(height: 32) // push menu below node
                         VStack(spacing: 0) {
-                            ForEach(options, id: \.self) { option in
+                            // Iterate over sorted keys from the dictionary for stable order.
+                            ForEach(NodeOptions.options.keys.sorted(), id: \.self) { key in
                                 Button(action: {
                                     withAnimation {
                                         showDropdown = false
                                         isActive = false
                                     }
-                                    print("Selected option: \(option)")
+                                    node.selectedOption = key
                                 }) {
-                                    Text(option)
+                                    Text(key)
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(.black)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -82,7 +73,7 @@ struct NodeView: View {
                     }
                 }
 
-                // Node stays in fixed position
+                // Node remains in fixed position
                 Circle()
                     .fill(color)
                     .frame(width: isActive ? 22 : 16, height: isActive ? 22 : 16)
@@ -98,7 +89,7 @@ struct NodeView: View {
                     .contentShape(Rectangle())
             }
         }
-        .position(position)
+        .position(node.position)
         .zIndex(showDropdown ? 1 : 0)
     }
 }

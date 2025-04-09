@@ -13,23 +13,20 @@ struct PathsOverlayView: View {
     @Binding var paths: [ColoredPath]
     
     var body: some View {
-
         GeometryReader { geometry in
             ZStack {
-                ForEach(paths) { coloredPath in
+                ForEach($paths, id: \.id) { $coloredPath in
+//                    let cp = coloredPath
                     // Draw the path
                     Path(coloredPath.path.cgPath)
                         .stroke(coloredPath.color, lineWidth: 5)
-
+                    
                     // Draw interactive nodes
-                    ForEach(coloredPath.nodes) { node in
-                        NodeView(node: node, position: node.position, color: coloredPath.color)
+                    ForEach($coloredPath.nodes, id: \.id) { $node in
+                        NodeView(node: $node, color: coloredPath.color)
                     }
                 }
             }
         }
     }
 }
-
-
-
