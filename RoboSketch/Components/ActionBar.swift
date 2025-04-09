@@ -137,16 +137,10 @@ struct ActionBar: View {
         
         // Iterate over each ColoredPath
         for coloredPath in paths {
-            // We assume encodedPath is a non-optional String property of ColoredPath.
-            //let encoded = coloredPath.encodedPath
-            let encoded = coloredPath.encodedPath.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !encoded.isEmpty else {
-                print("Skipping path with empty encodedPath.")
-                continue
-            }
+            let encoded = coloredPath.encodedPath
             if let data = encoded.data(using: .utf8) {
                 do {
-                    // Assuming the top-level JSON is an array of command dictionaries.
+                    // Decode the top-level JSON as an array of command dictionaries.
                     if let commands = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] {
                         for command in commands {
                             guard let cmd = command["cmd"] as? String,
@@ -162,54 +156,110 @@ struct ActionBar: View {
                                     scriptLines.append("    delay(50)")
                                 }
                             } else if cmd == "lineTo" {
-                                // Process the "lineTo" commands with turn calculations.
                                 scriptLines.append("    # Begin lineTo segment")
+                                
+                                // Variables for tracking previous point and heading.
                                 var previousPoint: (x: Double, y: Double)? = nil
                                 var previousHeading: Double? = nil
                                 
-                                // Iterate over each point in the "lineTo" segment.
+                                // Variables for condensing turn commands.
+                                var pendingTurnDirection: String? = nil  // "turn left angle" or "turn right angle"
+                                var pendingTurnSteps = 0
+                                
+                                // Variable to accumulate forward steps.
+                                var pendingForwardSteps = 0
+                                
                                 for pt in points {
                                     if let x = pt["x"] as? Double,
                                        let y = pt["y"] as? Double {
-                                        if let prev = previousPoint {
-                                            // Calculate heading (in degrees) from the previous point to the current point.
+                                        // If we have a previous point, we can compute a heading.
+                                        if let prev = previousPoint,
+                                           let prevHeading = previousHeading {
                                             let dx = x - prev.x
                                             let dy = y - prev.y
                                             let currentHeading = atan2(dy, dx) * 180.0 / Double.pi
                                             
-                                            if let prevHeading = previousHeading {
-                                                // Calculate the delta between headings,
-                                                // normalized to the range [-180, 180].
-                                                let deltaAngle = fmod(currentHeading - prevHeading + 180.0, 360.0) - 180.0
-                                                
-                                                // Only consider turns if the change is at least 20°.
-                                                if abs(deltaAngle) >= 20.0 {
-                                                    // Each 35° of turn corresponds to one step.
-                                                    let turnSteps = Int(round(abs(deltaAngle) / 25.0))
-                                                    
-                                                    if deltaAngle < 0 {
-                                                        // Positive delta: "turn left angle" command.
-                                                        scriptLines.append("    # Turn left by \(turnSteps) (approx \(turnSteps*35)°)")
-                                                        scriptLines.append("    crawler.do_action(\"turn left angle\", \(turnSteps), speed)")
-                                                    } else {
-                                                        // Negative delta: "turn right angle" command.
-                                                        scriptLines.append("    # Turn right by \(turnSteps) (approx \(turnSteps*35)°)")
-                                                        scriptLines.append("    crawler.do_action(\"turn right angle\", \(turnSteps), speed)")
-                                                    }
+                                            // Compute the delta between headings, normalized to [-180, 180].
+                                            let deltaAngle = fmod(currentHeading - prevHeading + 180.0, 360.0) - 180.0
+                                            
+                                            // Process turns only if change is 20° or more.
+                                            if abs(deltaAngle) >= 20.0 {
+                                                // Before processing a turn, flush any accumulated forward commands.
+                                                if pendingForwardSteps > 0 {
+                                                    scriptLines.append("    # Move forward by \(pendingForwardSteps) step\(pendingForwardSteps > 1 ? "s" : "")")
+                                                    scriptLines.append("    crawler.do_action(\"forward\", \(pendingForwardSteps), speed)")
                                                     scriptLines.append("    delay(50)")
+                                                    pendingForwardSteps = 0
                                                 }
+                                                
+                                                // Map each 35° to one step.
+                                                let turnSteps = Int(round(abs(deltaAngle) / 35.0))
+                                                let currentDirection = deltaAngle > 0 ? "turn left angle" : "turn right angle"
+                                                
+                                                // If there is a pending turn with the same direction, accumulate steps.
+                                                if let pending = pendingTurnDirection {
+                                                    if pending == currentDirection {
+                                                        pendingTurnSteps += turnSteps
+                                                    } else {
+                                                        // Flush the previous pending turn command.
+                                                        scriptLines.append("    # Combined \(pending) by \(pendingTurnSteps) (approx \(pendingTurnSteps * 35)°)")
+                                                        scriptLines.append("    crawler.do_action(\"\(pending)\", \(pendingTurnSteps), speed)")
+                                                        scriptLines.append("    delay(50)")
+                                                        // Start new pending turn.
+                                                        pendingTurnDirection = currentDirection
+                                                        pendingTurnSteps = turnSteps
+                                                    }
+                                                } else {
+                                                    pendingTurnDirection = currentDirection
+                                                    pendingTurnSteps = turnSteps
+                                                }
+                                                
+                                                // Flush pending turn commands immediately.
+                                                if let pending = pendingTurnDirection, pendingTurnSteps > 0 {
+                                                    scriptLines.append("    # Combined \(pending) by \(pendingTurnSteps) (approx \(pendingTurnSteps * 35)°)")
+                                                    scriptLines.append("    crawler.do_action(\"\(pending)\", \(pendingTurnSteps), speed)")
+                                                    scriptLines.append("    delay(50)")
+                                                    pendingTurnDirection = nil
+                                                    pendingTurnSteps = 0
+                                                }
+                                                
+                                                // Update the heading for next computation.
+                                                previousHeading = currentHeading
                                             }
-                                            // Update the previous heading for the next segment.
-                                            previousHeading = atan2(y - prev.y, x - prev.x) * 180.0 / Double.pi
+                                            // If the delta is below threshold, do nothing.
                                         }
-                                        // Set the current point as the previous point.
-                                        previousPoint = (x, y)
                                         
-                                        // Append the forward movement command.
-                                        scriptLines.append("    # Move toward point (\(x), \(y))")
-                                        scriptLines.append("    crawler.do_action(\"forward\", 1, speed)")
-                                        scriptLines.append("    delay(50)")
+                                        // Accumulate forward steps (each point represents one forward step).
+                                        pendingForwardSteps += 1
+                                        
+                                        // Update tracking variables.
+                                        if previousPoint == nil {
+                                            // Initialize previousHeading if this is the first movement.
+                                            previousHeading = nil
+                                        } else {
+                                            // For subsequent points, update previousHeading based on last movement.
+                                            let dx = x - (previousPoint?.x ?? x)
+                                            let dy = y - (previousPoint?.y ?? y)
+                                            previousHeading = atan2(dy, dx) * 180.0 / Double.pi
+                                        }
+                                        previousPoint = (x, y)
                                     }
+                                }
+                                
+                                // At the end of the segment, flush any pending turn or forward commands.
+                                if let pending = pendingTurnDirection, pendingTurnSteps > 0 {
+                                    scriptLines.append("    # Combined \(pending) by \(pendingTurnSteps) (approx \(pendingTurnSteps * 35)°)")
+                                    scriptLines.append("    crawler.do_action(\"\(pending)\", \(pendingTurnSteps), speed)")
+                                    scriptLines.append("    delay(50)")
+                                    pendingTurnDirection = nil
+                                    pendingTurnSteps = 0
+                                }
+                                
+                                if pendingForwardSteps > 0 {
+                                    scriptLines.append("    # Move forward by \(pendingForwardSteps) step\(pendingForwardSteps > 1 ? "s" : "")")
+                                    scriptLines.append("    crawler.do_action(\"forward\", \(pendingForwardSteps), speed)")
+                                    scriptLines.append("    delay(50)")
+                                    pendingForwardSteps = 0
                                 }
                             } else {
                                 scriptLines.append("    # Unknown command: \(cmd)")

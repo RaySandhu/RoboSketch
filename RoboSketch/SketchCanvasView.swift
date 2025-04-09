@@ -165,7 +165,7 @@ struct SketchCanvasView: UIViewRepresentable {
         func convertStrokeToPath(_ stroke: PKStroke, in canvasView: PKCanvasView, strokeColor: Color) {
             // Capture the current drawing color before any delay or further processing.
             let newPath = UIBezierPath()
-            let points = stroke.path.interpolatedPoints(by: PKStrokePath.InterpolatedSlice.Stride.distance(5.0))
+            let points = stroke.path.interpolatedPoints(by: PKStrokePath.InterpolatedSlice.Stride.distance(50.0)) 
             let pointArray = Array(points)
             guard let firstPoint = pointArray.first else { return }
             newPath.move(to: firstPoint.location)
