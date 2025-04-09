@@ -17,7 +17,7 @@ struct ActionBar: View {
 
     var body: some View {
         HStack {
-            Button("Save") {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+            Button("Save") {
                 if paths.count > 0 {
                     savePaths()
                 } else{
@@ -138,7 +138,12 @@ struct ActionBar: View {
         // For each ColoredPath, decode its stored JSON encoding and generate commands.
         for coloredPath in paths {
             // We assume encodedPath is a non-optional String property of ColoredPath.
-            let encoded = coloredPath.encodedPath
+            //let encoded = coloredPath.encodedPath
+            let encoded = coloredPath.encodedPath.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !encoded.isEmpty else {
+                print("Skipping path with empty encodedPath.")
+                continue
+            }
             if let data = encoded.data(using: .utf8) {
                 do {
                     if let commands = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] {

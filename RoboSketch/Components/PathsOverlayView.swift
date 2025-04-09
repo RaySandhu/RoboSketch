@@ -19,7 +19,7 @@ struct PathsOverlayView: View {
                 ForEach(paths) { coloredPath in
                     // Draw the path
                     Path(coloredPath.path.cgPath)
-                        .stroke(coloredPath.color, lineWidth: 2)
+                        .stroke(coloredPath.color, lineWidth: 5)
 
                     // Draw interactive nodes
                     ForEach(coloredPath.nodes) { node in

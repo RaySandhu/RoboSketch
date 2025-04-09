@@ -178,9 +178,11 @@ struct SketchCanvasView: UIViewRepresentable {
             let end = pointArray.last?.location ?? .zero
             let nodes = [Node(position: start), Node(position: end)]
 
+            let encoded = newPath.toJSON() ?? ""
             let coloredPath = ColoredPath(
                 path: newPath,
-                encodedPath: "", // TODO: generate real encoding later if needed
+                //encodedPath: "", // TODO: generate real encoding later if needed
+                encodedPath: encoded,
                 color: strokeColor,
                 nodes: nodes
             )
