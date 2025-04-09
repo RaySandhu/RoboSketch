@@ -11,7 +11,7 @@ struct ContentView: View {
     @State private var paths: [ColoredPath] = []  // Store finalized path objects
     // State for robot selection and drawing color
     @State private var selectedRobot: String? = "Robot 1"
-    @State private var showBluetoothModal = false
+    @State private var showBluetoothModal = false 
     @State private var snackbarMessage: String? = nil  // Snackbar message state
 
     // Define a list of robots with their corresponding colors.
@@ -81,7 +81,6 @@ struct ContentView: View {
             }
         }
     }
-
 }
 
 

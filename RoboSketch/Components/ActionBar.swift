@@ -13,7 +13,7 @@ extension Color {
 struct ActionBar: View {
     @Binding var paths: [ColoredPath]
     @State private var undone: [ColoredPath] = []
-
+    
     var body: some View {
         HStack {
             Button("Save") {
@@ -26,7 +26,7 @@ struct ActionBar: View {
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .orange))
-
+            
             Button("Redo") {
                 if let lastUndone = undone.popLast() {
                     paths.append(lastUndone)
@@ -37,7 +37,7 @@ struct ActionBar: View {
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: undone.count == 0 ? .gray : .yellow))
-
+            
             Button("Undo") {
                 if let lastPath = paths.popLast() {
                     undone.append(lastPath)
@@ -48,13 +48,13 @@ struct ActionBar: View {
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .blue))
-
+            
             Button("Clear") {
                 paths = []
             }
             .padding()
             .buttonStyle(RoundedButtonStyle(backgroundColor: paths.count == 0 ? .gray : .red))
-
+            
             Button("Play") {
                 generatePythonScript(from: paths)
             }
@@ -66,7 +66,7 @@ struct ActionBar: View {
     
     func savePaths() {
         print("Number of paths to save: \(paths.count) \(paths[0].encodedPath)")
-
+        
         // Locate the documents directory on the device.
         let fileManager = FileManager.default
         guard let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -89,7 +89,7 @@ struct ActionBar: View {
                         "color": coloredPath.color.name,
                         "encoding": encodingObject
                     ]
-//                    print("Number of paths to save: \(paths.count) \(coloredPath.encodedPath)")
+                    //                    print("Number of paths to save: \(paths.count) \(coloredPath.encodedPath)")
                     print(pathDict)
                     pathsArray.append(pathDict)
                 } else {
@@ -99,8 +99,8 @@ struct ActionBar: View {
                 print("Failed to convert encodedPath to Data")
             }
         }
-
-
+        
+        
         
         // Convert the array into JSON data.
         do {
@@ -112,7 +112,7 @@ struct ActionBar: View {
         }
         
         if FileManager.default.fileExists(atPath: fileURL.path) {
-            print("File exists at: \(fileURL.path)")
+            print("Python script generated at: \(fileURL.path)".replacingOccurrences(of: " ", with: "\\ "))
         } else {
             print("File does NOT exist at: \(fileURL.path)")
         }
@@ -121,47 +121,83 @@ struct ActionBar: View {
     func generatePythonScript(from paths: [ColoredPath]) {
         var scriptLines = [String]()
         
-        // Header and initialization (matching your screenshot syntax)
+        // Header and initialization (using your picrawler syntax)
         scriptLines.append("from spider import Spider")
         scriptLines.append("from ezblock import print, delay")
         scriptLines.append("")
         scriptLines.append("crawler = Spider([10,11,12,4,5,6,1,2,3,7,8,9])")
         scriptLines.append("speed = 1000")
         scriptLines.append("")
-        
-        // Define the main() function
         scriptLines.append("def main():")
         
-        // For each ColoredPath, decode its JSON and generate do_action calls.
+        // Iterate over each ColoredPath
         for coloredPath in paths {
             let encoded = coloredPath.encodedPath
             if let data = encoded.data(using: .utf8) {
                 do {
+                    // Assuming the top-level JSON is an array of command dictionaries.
                     if let commands = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] {
                         for command in commands {
-                            guard
-                                let cmd = command["cmd"] as? String,
-                                let points = command["points"] as? [[String: Any]]
-                            else {
-                                continue
-                            }
+                            guard let cmd = command["cmd"] as? String,
+                                  let points = command["points"] as? [[String: Any]] else { continue }
                             
                             if cmd == "moveTo" {
-                                // Just note the starting point
+                                // Process the "moveTo" command as the starting point.
                                 if let pt = points.first,
-                                   let x = pt["x"],
-                                   let y = pt["y"] {
-                                    scriptLines.append("    # Starting point from moveTo: (\(x), \(y))")
+                                   let x = pt["x"] as? Double,
+                                   let y = pt["y"] as? Double {
+                                    scriptLines.append("    # Starting point at (\(x), \(y))")
+                                    scriptLines.append("    crawler.do_action(\"move\", 1, speed)")
+                                    scriptLines.append("    delay(50)")
                                 }
                             } else if cmd == "lineTo" {
-                                // Begin lineTo segment
+                                // Process the "lineTo" commands with turn calculations.
                                 scriptLines.append("    # Begin lineTo segment")
+                                var previousPoint: (x: Double, y: Double)? = nil
+                                var previousHeading: Double? = nil
+                                
+                                // Iterate over each point in the "lineTo" segment.
                                 for pt in points {
-                                    if let x = pt["x"], let y = pt["y"] {
+                                    if let x = pt["x"] as? Double,
+                                       let y = pt["y"] as? Double {
+                                        if let prev = previousPoint {
+                                            // Calculate heading (in degrees) from the previous point to the current point.
+                                            let dx = x - prev.x
+                                            let dy = y - prev.y
+                                            let currentHeading = atan2(dy, dx) * 180.0 / Double.pi
+                                            
+                                            if let prevHeading = previousHeading {
+                                                // Calculate the delta between headings,
+                                                // normalized to the range [-180, 180].
+                                                let deltaAngle = fmod(currentHeading - prevHeading + 180.0, 360.0) - 180.0
+                                                
+                                                // Only consider turns if the change is at least 20°.
+                                                if abs(deltaAngle) >= 20.0 {
+                                                    // Each 35° of turn corresponds to one step.
+                                                    let turnSteps = Int(round(abs(deltaAngle) / 25.0))
+                                                    
+                                                    if deltaAngle < 0 {
+                                                        // Positive delta: "turn left angle" command.
+                                                        scriptLines.append("    # Turn left by \(turnSteps) (approx \(turnSteps*35)°)")
+                                                        scriptLines.append("    crawler.do_action(\"turn left angle\", \(turnSteps), speed)")
+                                                    } else {
+                                                        // Negative delta: "turn right angle" command.
+                                                        scriptLines.append("    # Turn right by \(turnSteps) (approx \(turnSteps*35)°)")
+                                                        scriptLines.append("    crawler.do_action(\"turn right angle\", \(turnSteps), speed)")
+                                                    }
+                                                    scriptLines.append("    delay(50)")
+                                                }
+                                            }
+                                            // Update the previous heading for the next segment.
+                                            previousHeading = atan2(y - prev.y, x - prev.x) * 180.0 / Double.pi
+                                        }
+                                        // Set the current point as the previous point.
+                                        previousPoint = (x, y)
+                                        
+                                        // Append the forward movement command.
                                         scriptLines.append("    # Move toward point (\(x), \(y))")
                                         scriptLines.append("    crawler.do_action(\"forward\", 1, speed)")
-                                        // If you want a brief pause between steps, you can use:
-                                        // scriptLines.append("    delay(50)")  // ~50ms delay
+                                        scriptLines.append("    delay(50)")
                                     }
                                 }
                             } else {
@@ -179,30 +215,23 @@ struct ActionBar: View {
             }
         }
         
-        // End the script by standing
+        // End the script with the stand command.
         scriptLines.append("    crawler.do_action(\"stand\", 1, speed)")
         scriptLines.append("")
-        
-        // Define forever() if you want to call main repeatedly
         scriptLines.append("def forever():")
         scriptLines.append("    main()")
-        scriptLines.append("")
         
-        // (Optional) If you want to run main once when the script is called directly:
-        scriptLines.append("if __name__ == \"__main__\":")
-        scriptLines.append("    main()")
-        
-        // Join the lines into a single script string.
+        // Join the generated lines into a single Python script.
         let script = scriptLines.joined(separator: "\n")
         
-        // Save the generated script to the Documents directory (adjust as needed).
+        // Save the generated script to the Documents directory.
         let fileManager = FileManager.default
         if let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
             let fileURL = documentsDirectory.appendingPathComponent("generated_script.py")
             do {
                 try script.write(to: fileURL, atomically: true, encoding: .utf8)
-                print("Python script generated at: \(fileURL)")
-                // Copy the script to the clipboard if desired.
+                print("code \(fileURL)".replacingOccurrences(of: "%20", with: "\\ ").replacingOccurrences(of: "file://", with: ""))
+                // Optionally, copy the script to the clipboard.
                 UIPasteboard.general.string = script
                 print("Script copied to clipboard.")
             } catch {
@@ -210,4 +239,23 @@ struct ActionBar: View {
             }
         }
     }
+}
+
+
+
+
+
+nodes = {
+    "dance": """
+    def dance():
+        background_music('angry.mp3')
+        music_set_volume(50)
+        for _ in range(2):
+            _SPIDER__.do_action('stand', 1, speed)
+            _SPIDER__.do_action('sit', 1, speed)
+            _SPIDER__.do_action('push_up', 1, speed)
+            _SPIDER__.do_action('backward', 1, speed)
+            _SPIDER__.do_action('twist', 1, speed)
+
+"""
 }
