@@ -130,6 +130,7 @@ struct ActionBar: View {
         // Header and initialization (using your picrawler syntax)
         scriptLines.append("from spider import Spider")
         scriptLines.append("from ezblock import print, delay")
+        scriptLines.append("from Music import *")
         scriptLines.append("")
         scriptLines.append("crawler = Spider([10,11,12,4,5,6,1,2,3,7,8,9])")
         scriptLines.append("speed = 1000")
